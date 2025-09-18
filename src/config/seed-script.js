@@ -1,8 +1,4 @@
 const sqlScript = `
--- Asegúrate de estar usando la base de datos correcta
--- En DBeaver, ya deberías estar conectado a 'dados_pizza', así que esta línea es opcional.
-USE dados_pizza;
-
 -- SECCIÓN 1: Roles de Usuario
 INSERT INTO roles(name, route, created_at, updated_at) VALUES
 ('CLIENTE', '/client/products/list', NOW(), NOW()),
