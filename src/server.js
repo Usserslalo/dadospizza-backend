@@ -14,6 +14,7 @@ const orderRoutes = require('./routers/orders.routes'); // <-- Importamos las ru
 const restaurantRoutes = require('./routers/restaurant.routes'); // <-- Importamos las rutas del restaurante
 const deliveryRoutes = require('./routers/delivery.routes'); // <-- Importamos las rutas del repartidor
 const configureSocket = require('./config/socket'); // <-- Importamos la configuración de Socket.IO
+const adminRoutes = require('./routers/admin.routes'); // <-- Importamos las rutas de administración
 
 // Solución para el error de BigInt
 BigInt.prototype.toJSON = function() {
@@ -77,6 +78,10 @@ app.use('/api/restaurant', restaurantRoutes);
 // Le decimos a nuestra app que use las rutas del repartidor
 // Todo lo que empiece con '/api/delivery' será manejado por 'deliveryRoutes'
 app.use('/api/delivery', deliveryRoutes);
+
+// Le decimos a nuestra app que use las rutas de administración
+// Todo lo que empiece con '/api/admin' será manejado por 'adminRoutes'
+app.use('/api/admin', adminRoutes);
 
 
 // 6. Iniciar el servidor
