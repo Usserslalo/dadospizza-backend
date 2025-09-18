@@ -1,4 +1,4 @@
-const sqlScript = `
+module.exports = `
 -- SECCIÓN 1: Roles de Usuario
 INSERT INTO roles(name, route, created_at, updated_at) VALUES
 ('CLIENTE', '/client/products/list', NOW(), NOW()),

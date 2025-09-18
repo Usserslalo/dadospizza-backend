@@ -1,7 +1,7 @@
 // src/controllers/admin.controller.js
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { sqlScript } = require('../config/seed-script');
+const sqlScript = require('../config/seed-script');
 
 const seedDatabase = async (req, res) => {
   const { secret } = req.body;
