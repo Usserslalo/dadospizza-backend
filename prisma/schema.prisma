@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -38,8 +38,8 @@ model address {
   address      String   @db.VarChar(255)
   neighborhood String   @db.VarChar(180)
   alias        String?  @db.VarChar(100)
-  lat          Float    @db.DoublePrecision
-  lng          Float    @db.DoublePrecision
+  lat          Float
+  lng          Float
   created_at   DateTime @db.Timestamp(0)
   updated_at   DateTime @db.Timestamp(0)
   users        users    @relation(fields: [id_user], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -50,8 +50,8 @@ model branches {
   id         BigInt   @id @default(autoincrement())
   name       String   @db.VarChar(100)
   address    String
-  lat        Float?   @db.DoublePrecision
-  lng        Float?   @db.DoublePrecision
+  lat        Float?
+  lng        Float?
   phone      String?  @db.VarChar(20)
   created_at DateTime @db.Timestamp(0)
   updated_at DateTime @db.Timestamp(0)
