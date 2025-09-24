@@ -22,7 +22,7 @@ const getMyAssignedOrders = async (req, res) => {
       where: {
         id_delivery: BigInt(deliveryUserId),
         status: {
-          in: ['DESPACHADO', 'EN_CAMINO'] // Estados que puede manejar el repartidor
+          in: ['DESPACHADO', 'EN CAMINO'] // Estados que puede manejar el repartidor
         }
       },
       include: {
@@ -53,6 +53,15 @@ const getMyAssignedOrders = async (req, res) => {
             id: true,
             name: true,
             address: true,
+            phone: true
+          }
+        },
+        // Información del repartidor asignado
+        users_orders_id_deliveryTousers: {
+          select: {
+            id: true,
+            name: true,
+            lastname: true,
             phone: true
           }
         },
@@ -90,67 +99,78 @@ const getMyAssignedOrders = async (req, res) => {
       }
     });
 
-    // Formatear la respuesta para que sea más clara
+    // Formatear la respuesta para convertir BigInt a string y manejar valores null
     const formattedOrders = assignedOrders.map(order => ({
-      id: order.id,
-      status: order.status,
-      payment_method: order.payment_method,
-      subtotal: order.subtotal,
-      delivery_fee: order.delivery_fee,
-      total: order.total,
-      created_at: order.created_at,
-      updated_at: order.updated_at,
-      client: {
-        id: order.users_orders_id_clientTousers.id,
-        name: order.users_orders_id_clientTousers.name,
-        lastname: order.users_orders_id_clientTousers.lastname,
-        phone: order.users_orders_id_clientTousers.phone,
-        email: order.users_orders_id_clientTousers.email
-      },
-      delivery_address: {
-        id: order.address.id,
-        address: order.address.address,
-        neighborhood: order.address.neighborhood,
-        alias: order.address.alias,
-        coordinates: {
-          lat: order.address.lat,
-          lng: order.address.lng
-        }
-      },
-      branch: {
-        id: order.branches.id,
-        name: order.branches.name,
-        address: order.branches.address,
-        phone: order.branches.phone
-      },
-      products: order.order_has_products.map(item => ({
-        id: item.id,
-        product: {
-          id: item.products.id,
-          name: item.products.name,
-          description: item.products.description
-        },
-        size: item.sizes ? {
-          id: item.sizes.id,
-          name: item.sizes.name
+      id: order.id.toString(),
+      id_client: order.id_client.toString(),
+      id_delivery: order.id_delivery ? order.id_delivery.toString() : null,
+      id_address: order.id_address.toString(),
+      id_branch: order.id_branch.toString(),
+      status: order.status || '',
+      payment_method: order.payment_method || 'Efectivo',
+      subtotal: order.subtotal ? order.subtotal.toString() : '0.00',
+      delivery_fee: order.delivery_fee ? order.delivery_fee.toString() : '0.00',
+      total: order.total ? order.total.toString() : '0.00',
+      created_at: order.created_at ? order.created_at.toISOString() : new Date().toISOString(),
+      updated_at: order.updated_at ? order.updated_at.toISOString() : new Date().toISOString(),
+      client: order.users_orders_id_clientTousers ? {
+        id: order.users_orders_id_clientTousers.id.toString(),
+        name: order.users_orders_id_clientTousers.name || '',
+        lastname: order.users_orders_id_clientTousers.lastname || '',
+        phone: order.users_orders_id_clientTousers.phone || '',
+        email: order.users_orders_id_clientTousers.email || ''
+      } : null,
+      address: order.address ? {
+        id: order.address.id.toString(),
+        address: order.address.address || '',
+        neighborhood: order.address.neighborhood || '',
+        alias: order.address.alias || null,
+        lat: order.address.lat || 0,
+        lng: order.address.lng || 0
+      } : null,
+      branch: order.branches ? {
+        id: order.branches.id.toString(),
+        name: order.branches.name || '',
+        address: order.branches.address || '',
+        phone: order.branches.phone || null
+      } : null,
+      delivery: order.users_orders_id_deliveryTousers ? {
+        id: order.users_orders_id_deliveryTousers.id.toString(),
+        name: order.users_orders_id_deliveryTousers.name || '',
+        lastname: order.users_orders_id_deliveryTousers.lastname || '',
+        phone: order.users_orders_id_deliveryTousers.phone || ''
+      } : null,
+      products: order.order_has_products ? order.order_has_products.map(item => ({
+        id: item.id.toString(),
+        id_product: item.id_product.toString(),
+        id_size: item.id_size ? item.id_size.toString() : null,
+        quantity: item.quantity || 0,
+        price_per_unit: item.price_per_unit ? item.price_per_unit.toString() : '0.00',
+        product: item.products ? {
+          id: item.products.id.toString(),
+          name: item.products.name || '',
+          description: item.products.description || ''
         } : null,
-        quantity: item.quantity,
-        price_per_unit: item.price_per_unit,
-        addons: item.order_item_addons.map(addon => ({
-          id: addon.id,
-          name: addon.addons.name,
-          price_at_purchase: addon.price_at_purchase
-        }))
-      }))
+        size: item.sizes ? {
+          id: item.sizes.id.toString(),
+          name: item.sizes.name || ''
+        } : null,
+        addons: item.order_item_addons ? item.order_item_addons.map(addon => ({
+          id: addon.id.toString(),
+          id_addon: addon.id_addon.toString(),
+          price_at_purchase: addon.price_at_purchase ? addon.price_at_purchase.toString() : '0.00',
+          addon: addon.addons ? {
+            id: addon.addons.id.toString(),
+            name: addon.addons.name || ''
+          } : null
+        })) : []
+      })) : []
     }));
 
     res.status(200).json({
       success: true,
       message: 'Pedidos asignados obtenidos exitosamente',
-      data: {
-        orders: formattedOrders,
-        total: formattedOrders.length
-      }
+      data: formattedOrders
     });
 
   } catch (error) {
@@ -174,8 +194,15 @@ const updateOrderStatus = async (req, res) => {
     const orderId = req.params.id;
     const { status: newStatus } = req.body;
 
+    // ===== LOGGING DETALLADO PARA DEBUGGING =====
+    console.log('=== UPDATE ORDER STATUS - DELIVERY ===');
+    console.log('Order ID:', orderId);
+    console.log('New Status:', newStatus);
+    console.log('User ID (Delivery):', deliveryUserId);
+
     // Validar que se proporcione el nuevo estado
     if (!newStatus) {
+      console.log('❌ ERROR: No se proporcionó el estado');
       return res.status(400).json({
         success: false,
         error: 'El campo status es requerido'
@@ -183,23 +210,38 @@ const updateOrderStatus = async (req, res) => {
     }
 
     // Validar que el nuevo estado sea válido para el repartidor
-    const validStatuses = ['EN_CAMINO', 'ENTREGADO'];
+    const validStatuses = ['EN CAMINO', 'ENTREGADO'];
+    console.log('=== VALIDACIÓN DE ESTADO ===');
+    console.log('Estado recibido:', newStatus);
+    console.log('Estados válidos:', validStatuses);
+    console.log('¿Estado válido?', validStatuses.includes(newStatus));
+
     if (!validStatuses.includes(newStatus)) {
+      console.log('❌ ERROR: Estado no válido');
       return res.status(400).json({
         success: false,
-        error: 'Estado no válido. Los estados permitidos son: EN_CAMINO, ENTREGADO'
+        error: 'Estado no válido. Los estados permitidos son: EN CAMINO, ENTREGADO'
       });
     }
 
     // Buscar el pedido por ID
+    console.log('=== BUSCANDO PEDIDO ===');
     const existingOrder = await prisma.orders.findUnique({
       where: {
         id: BigInt(orderId)
       }
     });
 
+    console.log('Pedido encontrado:', !!existingOrder);
+    if (existingOrder) {
+      console.log('Estado actual del pedido:', existingOrder.status);
+      console.log('Repartidor asignado:', existingOrder.id_delivery);
+      console.log('¿Es el repartidor correcto?', existingOrder.id_delivery === BigInt(deliveryUserId));
+    }
+
     // Verificar que el pedido existe
     if (!existingOrder) {
+      console.log('❌ ERROR: Pedido no encontrado');
       return res.status(404).json({
         success: false,
         error: 'Pedido no encontrado'
@@ -208,6 +250,7 @@ const updateOrderStatus = async (req, res) => {
 
     // Verificar que el pedido pertenece al repartidor autenticado
     if (existingOrder.id_delivery !== BigInt(deliveryUserId)) {
+      console.log('❌ ERROR: El pedido no pertenece al repartidor');
       return res.status(403).json({
         success: false,
         error: 'No tienes permiso para actualizar este pedido'
@@ -216,28 +259,39 @@ const updateOrderStatus = async (req, res) => {
 
     // Validar transiciones de estado válidas
     const currentStatus = existingOrder.status;
+    console.log('=== VALIDACIÓN DE TRANSICIÓN ===');
+    console.log('Estado actual:', currentStatus);
+    console.log('Estado destino:', newStatus);
+    
+    const validTransitions = {
+      'DESPACHADO': ['EN CAMINO'],
+      'EN CAMINO': ['ENTREGADO']
+    };
+    console.log('Transiciones válidas:', validTransitions);
+    
     let isValidTransition = false;
-
-    if (currentStatus === 'DESPACHADO' && newStatus === 'EN_CAMINO') {
+    if (currentStatus === 'DESPACHADO' && newStatus === 'EN CAMINO') {
       isValidTransition = true;
-    } else if (currentStatus === 'EN_CAMINO' && newStatus === 'ENTREGADO') {
+    } else if (currentStatus === 'EN CAMINO' && newStatus === 'ENTREGADO') {
       isValidTransition = true;
     }
+    
+    console.log('¿Transición válida?', isValidTransition);
 
     if (!isValidTransition) {
+      console.log('❌ ERROR: Transición de estado no válida');
       return res.status(400).json({
         success: false,
         error: 'Transición de estado no válida',
         details: {
           current_status: currentStatus,
           requested_status: newStatus,
-          valid_transitions: {
-            'DESPACHADO': ['EN_CAMINO'],
-            'EN_CAMINO': ['ENTREGADO']
-          }
+          valid_transitions: validTransitions
         }
       });
     }
+
+    console.log('✅ Todas las validaciones pasaron, procediendo a actualizar...');
 
     // Actualizar el estado del pedido
     const updatedOrder = await prisma.orders.update({
@@ -268,6 +322,8 @@ const updateOrderStatus = async (req, res) => {
         }
       }
     });
+
+    console.log('✅ Pedido actualizado exitosamente');
 
     // Formatear la respuesta
     const formattedOrder = {

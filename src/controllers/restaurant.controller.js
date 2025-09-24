@@ -2,6 +2,13 @@
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const branchDeliveryService = require('../services/branch-delivery-assignment.service');
+
+// Función legacy mantenida para compatibilidad (deprecated)
+async function findAvailableDelivery(branchId) {
+  console.log('⚠️ Usando función legacy findAvailableDelivery. Considera usar branchDeliveryService');
+  return null;
+}
 
 /**
  * @desc Obtener pedidos por estado para la sucursal del empleado
@@ -120,37 +127,66 @@ const getOrders = async (req, res) => {
       }
     });
 
-    // Formatear la respuesta para convertir BigInt a string
+    // Formatear la respuesta para convertir BigInt a string y manejar valores null
     const formattedOrders = orders.map(order => ({
       id: order.id.toString(),
       id_client: order.id_client.toString(),
+      id_delivery: order.id_delivery ? order.id_delivery.toString() : null,
       id_address: order.id_address.toString(),
       id_branch: order.id_branch.toString(),
-      status: order.status,
-      payment_method: order.payment_method,
-      subtotal: order.subtotal.toString(),
-      delivery_fee: order.delivery_fee.toString(),
-      total: order.total.toString(),
-      created_at: order.created_at,
-      updated_at: order.updated_at,
-      client: order.users_orders_id_clientTousers,
-      address: order.address,
-      branch: order.branches,
-      products: order.order_has_products.map(item => ({
+      status: order.status || '',
+      payment_method: order.payment_method || 'Efectivo',
+      subtotal: order.subtotal ? order.subtotal.toString() : '0.00',
+      delivery_fee: order.delivery_fee ? order.delivery_fee.toString() : '0.00',
+      total: order.total ? order.total.toString() : '0.00',
+      created_at: order.created_at ? order.created_at.toISOString() : new Date().toISOString(),
+      updated_at: order.updated_at ? order.updated_at.toISOString() : new Date().toISOString(),
+      client: order.users_orders_id_clientTousers ? {
+        id: order.users_orders_id_clientTousers.id.toString(),
+        name: order.users_orders_id_clientTousers.name || '',
+        lastname: order.users_orders_id_clientTousers.lastname || '',
+        phone: order.users_orders_id_clientTousers.phone || '',
+        email: order.users_orders_id_clientTousers.email || ''
+      } : null,
+      address: order.address ? {
+        id: order.address.id.toString(),
+        address: order.address.address || '',
+        neighborhood: order.address.neighborhood || '',
+        alias: order.address.alias || null,
+        lat: order.address.lat || 0,
+        lng: order.address.lng || 0
+      } : null,
+      branch: order.branches ? {
+        id: order.branches.id.toString(),
+        name: order.branches.name || '',
+        address: order.branches.address || '',
+        phone: order.branches.phone || null
+      } : null,
+      products: order.order_has_products ? order.order_has_products.map(item => ({
         id: item.id.toString(),
         id_product: item.id_product.toString(),
         id_size: item.id_size ? item.id_size.toString() : null,
-        quantity: item.quantity,
-        price_per_unit: item.price_per_unit.toString(),
-        product: item.products,
-        size: item.sizes,
-        addons: item.order_item_addons.map(addon => ({
+        quantity: item.quantity || 0,
+        price_per_unit: item.price_per_unit ? item.price_per_unit.toString() : '0.00',
+        product: item.products ? {
+          id: item.products.id.toString(),
+          name: item.products.name || '',
+          description: item.products.description || ''
+        } : null,
+        size: item.sizes ? {
+          id: item.sizes.id.toString(),
+          name: item.sizes.name || ''
+        } : null,
+        addons: item.order_item_addons ? item.order_item_addons.map(addon => ({
           id: addon.id.toString(),
           id_addon: addon.id_addon.toString(),
-          price_at_purchase: addon.price_at_purchase.toString(),
-          addon: addon.addons
-        }))
-      }))
+          price_at_purchase: addon.price_at_purchase ? addon.price_at_purchase.toString() : '0.00',
+          addon: addon.addons ? {
+            id: addon.addons.id.toString(),
+            name: addon.addons.name || ''
+          } : null
+        })) : []
+      })) : []
     }));
 
     res.status(200).json({
@@ -198,12 +234,12 @@ const updateOrderStatus = async (req, res) => {
       });
     }
 
-    // Mapear estados de entrada a valores del enum de Prisma
+    // Mapear estados de entrada a valores del enum de la base de datos
     const statusMapping = {
       'PAGADO': 'PAGADO',
-      'EN PREPARACION': 'EN_PREPARACION',
+      'EN PREPARACION': 'EN PREPARACION',
       'DESPACHADO': 'DESPACHADO',
-      'EN CAMINO': 'EN_CAMINO',
+      'EN CAMINO': 'EN CAMINO',
       'ENTREGADO': 'ENTREGADO',
       'CANCELADO': 'CANCELADO'
     };
@@ -259,15 +295,37 @@ const updateOrderStatus = async (req, res) => {
       });
     }
 
+    // Preparar datos de actualización
+    let updateData = {
+      status: prismaStatus,
+      updated_at: new Date()
+    };
+
+    // ASIGNACIÓN AUTOMÁTICA DE REPARTIDOR POR SUCURSAL cuando el estado es DESPACHADO
+    if (prismaStatus === 'DESPACHADO') {
+      console.log(`🏪 Asignando repartidor para sucursal ${existingOrder.id_branch}, pedido ${id}...`);
+      
+      const assignment = await branchDeliveryService.assignDeliveryByBranch(
+        id, 
+        existingOrder.id_branch, 
+        existingOrder.address
+      );
+      
+      if (assignment.success) {
+        console.log(`✅ ${assignment.message}`);
+        updateData.id_delivery = assignment.delivery.id;
+      } else {
+        console.log(`⚠️ ${assignment.message} (Código: ${assignment.code})`);
+        // Continuar sin asignar repartidor - el pedido quedará en estado DESPACHADO sin repartidor
+      }
+    }
+
     // Actualizar el estado del pedido
     const updatedOrder = await prisma.orders.update({
       where: {
         id: BigInt(id)
       },
-      data: {
-        status: prismaStatus,
-        updated_at: new Date()
-      },
+      data: updateData,
       include: {
         users_orders_id_clientTousers: {
           select: {

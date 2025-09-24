@@ -269,6 +269,116 @@ const createOrder = async (req, res) => {
   }
 };
 
+/**
+ * @desc Obtener el historial de pedidos del usuario autenticado
+ * @route GET /api/orders/my-history
+ * @access Private (requiere autenticación y rol CLIENTE)
+ */
+const getMyOrders = async (req, res) => {
+  try {
+    // Obtener el ID del usuario autenticado
+    const userId = req.user.userId;
+
+    // Consultar todos los pedidos del usuario con toda la información relacionada
+    const orders = await prisma.orders.findMany({
+      where: {
+        id_client: BigInt(userId)
+      },
+      orderBy: {
+        created_at: 'desc'
+      },
+      include: {
+        address: true,  // Incluir los detalles de la dirección de entrega
+        branches: true, // Incluir los detalles de la sucursal
+        order_has_products: {
+          include: {
+            products: true, // Dentro de cada producto del pedido, incluir los detalles del producto
+            sizes: true,    // Incluir el nombre del tamaño si aplica (ej. "Grande")
+            order_item_addons: {
+              include: {
+                addons: true // Dentro de cada addon del item, incluir los detalles del addon
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Formatear la respuesta para que sea más legible
+    const formattedOrders = orders.map(order => ({
+      id: order.id.toString(),
+      status: order.status,
+      payment_method: order.payment_method,
+      subtotal: order.subtotal.toString(),
+      delivery_fee: order.delivery_fee.toString(),
+      total: order.total.toString(),
+      created_at: order.created_at,
+      updated_at: order.updated_at,
+      address: {
+        id: order.address.id.toString(),
+        address: order.address.address,
+        neighborhood: order.address.neighborhood,
+        alias: order.address.alias,
+        lat: order.address.lat,
+        lng: order.address.lng
+      },
+      branches: {
+        id: order.branches.id.toString(),
+        name: order.branches.name,
+        address: order.branches.address,
+        phone: order.branches.phone
+      },
+      order_has_products: order.order_has_products.map(item => ({
+        id: item.id.toString(),
+        quantity: item.quantity,
+        price_per_unit: item.price_per_unit.toString(),
+        products: {
+          id: item.products.id.toString(),
+          name: item.products.name,
+          description: item.products.description
+        },
+        sizes: item.sizes ? {
+          id: item.sizes.id.toString(),
+          name: item.sizes.name
+        } : null,
+        order_item_addons: item.order_item_addons.map(addon => ({
+          id: addon.id.toString(),
+          price_at_purchase: addon.price_at_purchase.toString(),
+          addons: {
+            id: addon.addons.id.toString(),
+            name: addon.addons.name
+          }
+        }))
+      }))
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: 'Historial de pedidos obtenido exitosamente',
+      data: formattedOrders,
+      count: formattedOrders.length
+    });
+
+  } catch (error) {
+    console.error('Error al obtener historial de pedidos:', error);
+    
+    // Manejar errores específicos de Prisma
+    if (error.code === 'P2002') {
+      return res.status(400).json({
+        error: 'Error de duplicación en la base de datos'
+      });
+    }
+
+    res.status(500).json({
+      error: 'Error interno del servidor al obtener el historial de pedidos',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
 module.exports = {
-  createOrder
+  createOrder,
+  getMyOrders
 };

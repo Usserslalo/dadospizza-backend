@@ -126,6 +126,7 @@ const getProductById = async (req, res) => {
 
       // Formatear los precios según el formato requerido
       const prices = categoryPrices.map(cp => ({
+        id: cp.sizes.id.toString(),
         size: cp.sizes.name,
         price: cp.price.toString()
       }));

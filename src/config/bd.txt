@@ -332,3 +332,168 @@ INSERT INTO addon_prices(id_addon, id_size, price) VALUES
 ALTER TABLE users
 ADD COLUMN id_branch BIGINT NULL,
 ADD FOREIGN KEY (id_branch) REFERENCES branches(id) ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE product_images
+ADD COLUMN created_at TIMESTAMP(0) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN updated_at TIMESTAMP(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+ALTER TABLE category_prices
+ADD COLUMN created_at TIMESTAMP(0) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN updated_at TIMESTAMP(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- 1. VERIFICAR SI LAS TABLAS YA EXISTEN Y ELIMINARLAS SI ES NECESARIO
+DROP TABLE IF EXISTS delivery_zone_assignments;
+DROP TABLE IF EXISTS delivery_zones;
+
+-- 2. CREAR TABLA DE ZONAS DE COBERTURA
+CREATE TABLE delivery_zones (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  id_branch BIGINT NOT NULL,
+  polygon_coordinates JSON,
+  max_delivery_distance DECIMAL(10,2) DEFAULT 10.0,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (id_branch) REFERENCES branches(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE KEY unique_branch_zone (id_branch, name)
+);
+
+-- 3. CREAR TABLA DE ASIGNACIONES REPARTIDOR-ZONA
+CREATE TABLE delivery_zone_assignments (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_user BIGINT NOT NULL,
+  id_zone BIGINT NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (id_user) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (id_zone) REFERENCES delivery_zones(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE KEY unique_user_zone (id_user, id_zone)
+);
+
+-- 4. VERIFICAR Y AGREGAR COLUMNAS DE COORDENADAS A BRANCHES
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = 'dados_pizza' 
+   AND TABLE_NAME = 'branches' 
+   AND COLUMN_NAME = 'lat') > 0,
+  'SELECT "Columnas lat y lng ya existen en branches" as status;',
+  'ALTER TABLE branches ADD COLUMN lat DOUBLE PRECISION, ADD COLUMN lng DOUBLE PRECISION;'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 5. INSERTAR DATOS DE SUCURSALES (usando INSERT IGNORE para evitar duplicados)
+INSERT IGNORE INTO branches (id, name, address, lat, lng, phone, created_at, updated_at) VALUES
+(1, 'Dados Pizza - Ixmiquilpan Centro', 'Centro de Ixmiquilpan, Hidalgo', 20.4833, -99.2167, '771-123-4567', NOW(), NOW()),
+(2, 'Dados Pizza - Ixmiquilpan Norte', 'Zona Norte de Ixmiquilpan, Hidalgo', 20.5000, -99.2000, '771-123-4568', NOW(), NOW()),
+(3, 'Dados Pizza - Progreso de Obregón', 'Progreso de Obregón, Hidalgo', 20.2500, -99.1833, '771-123-4569', NOW(), NOW());
+
+-- 6. CREAR ZONAS DE COBERTURA PARA CADA SUCURSAL
+-- Zona para Ixmiquilpan Centro
+INSERT INTO delivery_zones (name, id_branch, polygon_coordinates, max_delivery_distance, created_at, updated_at) VALUES
+('Ixmiquilpan Centro', 1, 
+ JSON_OBJECT(
+   'center', JSON_OBJECT('lat', 20.4833, 'lng', -99.2167),
+   'radius', 5.0,
+   'polygon', JSON_ARRAY(
+     JSON_OBJECT('lat', 20.5200, 'lng', -99.2500),
+     JSON_OBJECT('lat', 20.5200, 'lng', -99.1800),
+     JSON_OBJECT('lat', 20.4500, 'lng', -99.1800),
+     JSON_OBJECT('lat', 20.4500, 'lng', -99.2500)
+   )
+ ), 5.0, NOW(), NOW());
+
+-- Zona para Ixmiquilpan Norte
+INSERT INTO delivery_zones (name, id_branch, polygon_coordinates, max_delivery_distance, created_at, updated_at) VALUES
+('Ixmiquilpan Norte', 2,
+ JSON_OBJECT(
+   'center', JSON_OBJECT('lat', 20.5000, 'lng', -99.2000),
+   'radius', 4.0,
+   'polygon', JSON_ARRAY(
+     JSON_OBJECT('lat', 20.5300, 'lng', -99.2300),
+     JSON_OBJECT('lat', 20.5300, 'lng', -99.1700),
+     JSON_OBJECT('lat', 20.4700, 'lng', -99.1700),
+     JSON_OBJECT('lat', 20.4700, 'lng', -99.2300)
+   )
+ ), 4.0, NOW(), NOW());
+
+-- Zona para Progreso de Obregón
+INSERT INTO delivery_zones (name, id_branch, polygon_coordinates, max_delivery_distance, created_at, updated_at) VALUES
+('Progreso de Obregón', 3,
+ JSON_OBJECT(
+   'center', JSON_OBJECT('lat', 20.2500, 'lng', -99.1833),
+   'radius', 6.0,
+   'polygon', JSON_ARRAY(
+     JSON_OBJECT('lat', 20.2800, 'lng', -99.2200),
+     JSON_OBJECT('lat', 20.2800, 'lng', -99.1500),
+     JSON_OBJECT('lat', 20.2200, 'lng', -99.1500),
+     JSON_OBJECT('lat', 20.2200, 'lng', -99.2200)
+   )
+ ), 6.0, NOW(), NOW());
+
+-- 7. CREAR ÍNDICES PARA OPTIMIZACIÓN
+CREATE INDEX idx_delivery_zones_branch ON delivery_zones(id_branch);
+CREATE INDEX idx_delivery_zones_active ON delivery_zones(is_active);
+CREATE INDEX idx_zone_assignments_user ON delivery_zone_assignments(id_user);
+CREATE INDEX idx_zone_assignments_zone ON delivery_zone_assignments(id_zone);
+CREATE INDEX idx_zone_assignments_active ON delivery_zone_assignments(is_active);
+
+-- 8. VERIFICAR ESTRUCTURA CREADA
+SELECT 'ESTRUCTURA DE TABLAS CREADAS' as status;
+DESCRIBE delivery_zones;
+DESCRIBE delivery_zone_assignments;
+
+-- 9. MOSTRAR SUCURSALES Y ZONAS CREADAS
+SELECT 
+  b.id as branch_id,
+  b.name as branch_name,
+  b.lat,
+  b.lng,
+  COUNT(dz.id) as zones_count
+FROM branches b
+LEFT JOIN delivery_zones dz ON b.id = dz.id_branch
+GROUP BY b.id, b.name, b.lat, b.lng;
+
+-- 10. MOSTRAR ZONAS DE COBERTURA
+SELECT 
+  dz.id as zone_id,
+  dz.name as zone_name,
+  b.name as branch_name,
+  dz.max_delivery_distance,
+  dz.is_active
+FROM delivery_zones dz
+JOIN branches b ON dz.id_branch = b.id
+ORDER BY b.id, dz.name;
+
+-- 11. VERIFICAR QUE LAS LLAVES FORÁNEAS FUNCIONAN
+SELECT 'VERIFICACIÓN DE LLAVES FORÁNEAS' as status;
+SELECT 
+  CONSTRAINT_NAME,
+  TABLE_NAME,
+  COLUMN_NAME,
+  REFERENCED_TABLE_NAME,
+  REFERENCED_COLUMN_NAME
+FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+WHERE TABLE_SCHEMA = 'dados_pizza' 
+  AND TABLE_NAME IN ('delivery_zones', 'delivery_zone_assignments')
+  AND REFERENCED_TABLE_NAME IS NOT NULL;
+
+-- 12. MOSTRAR RESUMEN FINAL
+SELECT 'CONFIGURACIÓN COMPLETADA EXITOSAMENTE' as status;
+SELECT 
+  'Sucursales' as tipo,
+  COUNT(*) as cantidad
+FROM branches
+UNION ALL
+SELECT 
+  'Zonas de Cobertura' as tipo,
+  COUNT(*) as cantidad
+FROM delivery_zones
+UNION ALL
+SELECT 
+  'Asignaciones' as tipo,
+  COUNT(*) as cantidad
+FROM delivery_zone_assignments;

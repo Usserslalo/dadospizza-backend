@@ -13,6 +13,7 @@ const productRoutes = require('./routers/products.routes'); // <-- Importamos la
 const orderRoutes = require('./routers/orders.routes'); // <-- Importamos las rutas de pedidos
 const restaurantRoutes = require('./routers/restaurant.routes'); // <-- Importamos las rutas del restaurante
 const deliveryRoutes = require('./routers/delivery.routes'); // <-- Importamos las rutas del repartidor
+const sizesRoutes = require('./routers/sizes.routes'); // <-- Importamos las rutas de tamaños
 const configureSocket = require('./config/socket'); // <-- Importamos la configuración de Socket.IO
 
 // Solución para el error de BigInt
@@ -77,6 +78,10 @@ app.use('/api/restaurant', restaurantRoutes);
 // Le decimos a nuestra app que use las rutas del repartidor
 // Todo lo que empiece con '/api/delivery' será manejado por 'deliveryRoutes'
 app.use('/api/delivery', deliveryRoutes);
+
+// Le decimos a nuestra app que use las rutas de tamaños
+// Todo lo que empiece con '/api/sizes' será manejado por 'sizesRoutes'
+app.use('/api/sizes', sizesRoutes);
 
 
 // 6. Iniciar el servidor

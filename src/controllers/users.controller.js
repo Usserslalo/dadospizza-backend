@@ -75,15 +75,18 @@ const register = async (req, res) => {
       return newUser;
     });
 
-    // Respuesta exitosa
+    // Respuesta exitosa con información de rol
     res.status(201).json({
+      success: true,
       message: 'Usuario creado exitosamente',
       user: {
-        id: result.id,
+        id: result.id.toString(),
         email: result.email,
         name: result.name,
         lastname: result.lastname,
         phone: result.phone,
+        role: 'CLIENTE', // Los usuarios registrados siempre son CLIENTE
+        id_branch: null, // Los clientes no tienen sucursal
         created_at: result.created_at
       }
     });
@@ -117,9 +120,17 @@ const login = async (req, res) => {
       });
     }
 
-    // Buscar usuario por email
+    // Buscar usuario por email con sus roles
     const user = await prisma.users.findUnique({
-      where: { email: email }
+      where: { email: email },
+      include: {
+        user_has_roles: {
+          include: {
+            roles: true
+          }
+        },
+        branches: true
+      }
     });
 
     // Si no se encuentra el usuario, devolver error genérico por seguridad
@@ -146,16 +157,22 @@ const login = async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    // Respuesta exitosa
+    // Obtener el rol principal del usuario (asumimos que tiene un solo rol)
+    const userRole = user.user_has_roles[0]?.roles?.name || 'CLIENTE';
+    
+    // Respuesta exitosa con información de rol
     res.status(200).json({
+      success: true,
       message: 'Inicio de sesión exitoso',
       token: token,
       user: {
-        id: user.id,
+        id: user.id.toString(),
         email: user.email,
         name: user.name,
         lastname: user.lastname,
-        phone: user.phone
+        phone: user.phone,
+        role: userRole,
+        id_branch: user.id_branch ? user.id_branch.toString() : null
       }
     });
 
@@ -175,20 +192,18 @@ const getProfile = async (req, res) => {
     // Obtener el userId del middleware de autenticación
     const { userId } = req.user;
 
-    // Buscar al usuario en la base de datos
+    // Buscar al usuario en la base de datos con sus roles
     const user = await prisma.users.findUnique({
       where: {
-        id: userId
+        id: BigInt(userId)
       },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        lastname: true,
-        phone: true,
-        created_at: true,
-        updated_at: true
-        // Excluimos explícitamente el campo password por seguridad
+      include: {
+        user_has_roles: {
+          include: {
+            roles: true
+          }
+        },
+        branches: true
       }
     });
 
@@ -199,10 +214,24 @@ const getProfile = async (req, res) => {
       });
     }
 
-    // Respuesta exitosa con los datos del perfil
+    // Obtener el rol principal del usuario
+    const userRole = user.user_has_roles[0]?.roles?.name || 'CLIENTE';
+    
+    // Respuesta exitosa con los datos del perfil incluyendo rol
     res.status(200).json({
+      success: true,
       message: 'Perfil obtenido exitosamente',
-      user: user
+      user: {
+        id: user.id.toString(),
+        email: user.email,
+        name: user.name,
+        lastname: user.lastname,
+        phone: user.phone,
+        role: userRole,
+        id_branch: user.id_branch ? user.id_branch.toString() : null,
+        created_at: user.created_at,
+        updated_at: user.updated_at
+      }
     });
 
   } catch (error) {

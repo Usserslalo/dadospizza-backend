@@ -1,10 +1,85 @@
 # API Documentation - Dados Pizza Backend
 
+## 🗄️ Configuración de Base de Datos
+
+### Compatibilidad con MySQL
+
+Este backend está configurado para trabajar con **MySQL 8.0+** como base de datos principal. El schema de Prisma está optimizado para MySQL y no incluye anotaciones específicas de PostgreSQL.
+
+#### Schema de Prisma - MySQL Compatible
+
+El archivo `prisma/schema.prisma` está configurado correctamente para MySQL:
+
+```prisma
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+```
+
+#### Tipos de Datos Optimizados para MySQL
+
+- **Coordenadas geográficas**: Los campos `lat` y `lng` en los modelos `address` y `branches` están definidos como `Float` sin anotaciones específicas de base de datos, lo que los hace compatibles con MySQL.
+
+```prisma
+model address {
+  lat          Float    // Compatible con MySQL
+  lng          Float    // Compatible con MySQL
+}
+
+model branches {
+  lat        Float?     // Compatible con MySQL
+  lng        Float?     // Compatible con MySQL
+}
+```
+
+#### Configuración Requerida
+
+1. **Variables de Entorno**:
+   ```env
+   DATABASE_URL="mysql://usuario:password@localhost:3306/dadospizza"
+   JWT_SECRET="tu_clave_secreta_jwt"
+   ```
+
+2. **Generar Cliente de Prisma**:
+   ```bash
+   npx prisma generate
+   ```
+
+3. **Aplicar Migraciones**:
+   ```bash
+   npx prisma db push
+   # o
+   npx prisma migrate dev
+   ```
+
+#### Características de la Base de Datos
+
+- **Motor**: MySQL 8.0+
+- **ORM**: Prisma Client
+- **Migraciones**: Automáticas con Prisma
+- **Tipos de datos**: Optimizados para MySQL (BigInt, Decimal, Float, etc.)
+- **Relaciones**: Foreign keys con cascada para integridad referencial
+- **Índices**: Configurados automáticamente por Prisma
+
+#### Solución BigInt para JSON
+
+El servidor incluye una configuración especial para manejar BigInt en respuestas JSON:
+
+```javascript
+// Solución para el error de BigInt
+BigInt.prototype.toJSON = function() {
+  return this.toString();
+};
+```
+
+---
+
 ## Endpoints de Usuarios
 
 ### 1. Registro de Usuarios
 
-### POST /api/users/register
+**POST** `/api/users/register`
 
 Registra un nuevo usuario en el sistema y le asigna automáticamente el rol de 'CLIENTE'.
 
@@ -38,6 +113,7 @@ Content-Type: application/json
 ##### Éxito (201 Created)
 ```json
 {
+  "success": true,
   "message": "Usuario creado exitosamente",
   "user": {
     "id": "1",
@@ -45,6 +121,8 @@ Content-Type: application/json
     "name": "Juan",
     "lastname": "Pérez",
     "phone": "1234567890",
+    "role": "CLIENTE",
+    "id_branch": null,
     "created_at": "2024-01-15T10:30:00.000Z"
   }
 }
@@ -117,14 +195,17 @@ Content-Type: application/json
 ##### Éxito (200 OK)
 ```json
 {
+  "success": true,
   "message": "Inicio de sesión exitoso",
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTcwNTMxMjAwMCwiZXhwIjoxNzA1Mzk4NDAwfQ.example_signature",
   "user": {
-    "id": 1,
+    "id": "1",
     "email": "usuario@ejemplo.com",
     "name": "Juan",
     "lastname": "Pérez",
-    "phone": "1234567890"
+    "phone": "1234567890",
+    "role": "CLIENTE",
+    "id_branch": null
   }
 }
 ```
@@ -187,13 +268,16 @@ Authorization: Bearer <token_jwt>
 **Respuesta exitosa (200):**
 ```json
 {
+  "success": true,
   "message": "Perfil obtenido exitosamente",
   "user": {
-    "id": 1,
+    "id": "1",
     "email": "usuario@ejemplo.com",
     "name": "Juan",
     "lastname": "Pérez",
     "phone": "1234567890",
+    "role": "CLIENTE",
+    "id_branch": null,
     "created_at": "2024-01-15T10:30:00.000Z",
     "updated_at": "2024-01-15T10:30:00.000Z"
   }
@@ -272,6 +356,7 @@ Content-Type: application/json
 **Respuesta exitosa (201):**
 ```json
 {
+  "success": true,
   "message": "Dirección creada exitosamente",
   "data": {
     "id": "1",
@@ -305,6 +390,7 @@ Authorization: Bearer <token>
 **Respuesta exitosa (200):**
 ```json
 {
+  "success": true,
   "message": "Direcciones obtenidas exitosamente",
   "data": [
     {
@@ -354,6 +440,7 @@ Content-Type: application/json
 **Respuesta exitosa (200):**
 ```json
 {
+  "success": true,
   "message": "Dirección actualizada exitosamente",
   "data": {
     "id": "1",
@@ -391,6 +478,7 @@ Authorization: Bearer <token>
 **Respuesta exitosa (200):**
 ```json
 {
+  "success": true,
   "message": "Dirección eliminada correctamente"
 }
 ```
@@ -559,40 +647,45 @@ Obtiene el detalle completo de un producto específico. Este endpoint maneja la 
 {
   "success": true,
   "data": {
-    "id": "1",
+    "id": 1,
     "name": "Pizza Hawaiana",
     "description": "Pizza con jamón y piña",
     "prices": [
       {
+        "id": "1",
         "size": "Personal",
         "price": "75.00"
       },
       {
+        "id": "2",
         "size": "Mediana",
         "price": "160.00"
       },
       {
+        "id": "3",
         "size": "Grande",
         "price": "180.00"
       },
       {
+        "id": "4",
         "size": "Familiar",
         "price": "210.00"
       },
       {
+        "id": "5",
         "size": "Cuadrada",
         "price": "245.00"
       }
     ],
     "category": {
-      "id": "1",
+      "id": 1,
       "name": "Pizzas",
       "description": "Pizzas artesanales"
     },
     "images": [
       {
-        "id": "1",
-        "id_product": "1",
+        "id": 1,
+        "id_product": 1,
         "image_url": "https://ejemplo.com/pizza-hawaiana.jpg"
       }
     ],
@@ -616,6 +709,121 @@ Obtiene el detalle completo de un producto específico. Este endpoint maneja la 
 
 ---
 
+## 📂 Endpoints de Categorías
+
+### GET /api/categories
+**Obtener todas las categorías**
+
+Obtiene todas las categorías de productos disponibles en el sistema.
+
+**Autenticación:** No requerida (público)
+
+**Respuesta exitosa (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "Premium",
+      "description": "Nuestras pizzas más completas y con más ingredientes.",
+      "created_at": "2024-01-15T10:30:00.000Z",
+      "updated_at": "2024-01-15T10:30:00.000Z"
+    },
+    {
+      "id": 2,
+      "name": "Tradicional",
+      "description": "Los sabores clásicos que nunca fallan.",
+      "created_at": "2024-01-15T10:30:00.000Z",
+      "updated_at": "2024-01-15T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+**Errores posibles:**
+- `500`: Error interno del servidor
+
+---
+
+## 📏 Endpoints de Tamaños
+
+### GET /api/sizes
+**Obtener todos los tamaños**
+
+Obtiene todos los tamaños disponibles para los productos.
+
+**Autenticación:** No requerida (público)
+
+**Respuesta exitosa (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "Personal",
+      "created_at": "2024-01-15T10:30:00.000Z",
+      "updated_at": "2024-01-15T10:30:00.000Z"
+    },
+    {
+      "id": 2,
+      "name": "Mediana",
+      "created_at": "2024-01-15T10:30:00.000Z",
+      "updated_at": "2024-01-15T10:30:00.000Z"
+    },
+    {
+      "id": 3,
+      "name": "Grande",
+      "created_at": "2024-01-15T10:30:00.000Z",
+      "updated_at": "2024-01-15T10:30:00.000Z"
+    },
+    {
+      "id": 4,
+      "name": "Familiar",
+      "created_at": "2024-01-15T10:30:00.000Z",
+      "updated_at": "2024-01-15T10:30:00.000Z"
+    },
+    {
+      "id": 5,
+      "name": "Cuadrada",
+      "created_at": "2024-01-15T10:30:00.000Z",
+      "updated_at": "2024-01-15T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+### GET /api/sizes/:id
+**Obtener un tamaño por ID**
+
+Obtiene información detallada de un tamaño específico.
+
+**Autenticación:** No requerida (público)
+
+**Parámetros de URL:**
+- `id`: ID del tamaño
+
+**Respuesta exitosa (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "Personal",
+    "created_at": "2024-01-15T10:30:00.000Z",
+    "updated_at": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+**Errores posibles:**
+- `400`: ID de tamaño inválido
+- `404`: Tamaño no encontrado
+- `500`: Error interno del servidor
+
+---
+
 ## 🛒 Gestión de Pedidos
 
 ### POST /api/orders
@@ -624,6 +832,7 @@ Obtiene el detalle completo de un producto específico. Este endpoint maneja la 
 Crea un pedido completo con cálculo de precios en el servidor para garantizar la integridad y seguridad de los datos.
 
 **Autenticación:** Requerida (Bearer Token)
+**Middleware:** `authMiddleware`
 
 **Body de la petición:**
 ```json
@@ -691,6 +900,81 @@ Crea un pedido completo con cálculo de precios en el servidor para garantizar l
 - **Validación robusta:** Verificación de existencia y disponibilidad de todos los elementos
 - **Seguridad:** Autenticación obligatoria y validación de permisos
 - **Trazabilidad:** Registro completo de precios al momento de la compra
+- **Notificaciones en tiempo real:** Emisión automática de eventos Socket.IO a la sucursal correspondiente
+
+### GET /api/orders/my-history
+**Obtener historial de pedidos del usuario**
+
+Obtiene el historial completo de pedidos del usuario autenticado con toda la información relacionada.
+
+**Autenticación:** Requerida (Bearer Token)
+**Middleware:** `authMiddleware`, `checkRole('CLIENTE')`
+
+**Respuesta exitosa (200):**
+```json
+{
+  "success": true,
+  "message": "Historial de pedidos obtenido exitosamente",
+  "data": [
+    {
+      "id": "1",
+      "status": "ENTREGADO",
+      "payment_method": "Efectivo",
+      "subtotal": "180.00",
+      "delivery_fee": "0.00",
+      "total": "180.00",
+      "created_at": "2024-01-15T10:30:00.000Z",
+      "updated_at": "2024-01-15T12:00:00.000Z",
+      "address": {
+        "id": "1",
+        "address": "Calle Principal 123",
+        "neighborhood": "Centro",
+        "alias": "Casa",
+        "lat": 20.484123,
+        "lng": -99.216345
+      },
+      "branches": {
+        "id": "1",
+        "name": "Dados Pizza - Matriz Ixmiquilpan",
+        "address": "Av. Insurgentes Ote. 75, Centro, 42300 Ixmiquilpan, Hgo.",
+        "phone": "7711234567"
+      },
+      "order_has_products": [
+        {
+          "id": "1",
+          "quantity": 1,
+          "price_per_unit": "180.00",
+          "products": {
+            "id": "1",
+            "name": "Mexicana",
+            "description": "Jamon, salami, tocino, chorizo, champiñones, pimiento morron, cebolla y jalapeño"
+          },
+          "sizes": {
+            "id": "2",
+            "name": "Mediana"
+          },
+          "order_item_addons": [
+            {
+              "id": "1",
+              "price_at_purchase": "18.00",
+              "addons": {
+                "id": "1",
+                "name": "Ingrediente Extra"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "count": 1
+}
+```
+
+**Errores posibles:**
+- `401`: Token de autorización inválido o faltante
+- `403`: Usuario sin rol CLIENTE
+- `500`: Error interno del servidor
 
 ---
 
@@ -756,6 +1040,7 @@ Authorization: Bearer <token>
     {
       "id": "1",
       "id_client": "5",
+      "id_delivery": null,
       "id_address": "3",
       "id_branch": "1",
       "status": "PAGADO",
@@ -1256,13 +1541,14 @@ Para probar que la funcionalidad de roles funciona correctamente:
 
 ### 1. Obtener Pedidos Asignados
 
-### GET /api/delivery/my-orders
+**GET** `/api/delivery/my-orders`
 
 Obtiene todos los pedidos asignados al repartidor autenticado que están listos para ser entregados.
 
 #### Autenticación Requerida
 - **Token JWT**: Sí (Header: `Authorization: Bearer <token>`)
 - **Rol Requerido**: `REPARTIDOR`
+- **Middleware**: `authMiddleware`, `checkRole('REPARTIDOR')`
 
 #### Parámetros de Consulta
 Ninguno
@@ -1285,11 +1571,15 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
     "orders": [
       {
         "id": "1",
+        "id_client": "2",
+        "id_delivery": "3",
+        "id_address": "1",
+        "id_branch": "1",
         "status": "DESPACHADO",
         "payment_method": "Efectivo",
-        "subtotal": 180.00,
-        "delivery_fee": 25.00,
-        "total": 205.00,
+        "subtotal": "180.00",
+        "delivery_fee": "25.00",
+        "total": "205.00",
         "created_at": "2024-01-15T10:30:00.000Z",
         "updated_at": "2024-01-15T11:00:00.000Z",
         "client": {
@@ -1299,15 +1589,13 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
           "phone": "9876543210",
           "email": "maria@ejemplo.com"
         },
-        "delivery_address": {
+        "address": {
           "id": "1",
           "address": "Calle Principal 123",
           "neighborhood": "Centro",
           "alias": "Casa",
-          "coordinates": {
-            "lat": 20.484123,
-            "lng": -99.216345
-          }
+          "lat": 20.484123,
+          "lng": -99.216345
         },
         "branch": {
           "id": "1",
@@ -1315,9 +1603,19 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
           "address": "Av. Insurgentes Ote. 75, Centro, 42300 Ixmiquilpan, Hgo.",
           "phone": "7711234567"
         },
+        "delivery": {
+          "id": "3",
+          "name": "Carlos",
+          "lastname": "Repartidor",
+          "phone": "7719876543"
+        },
         "products": [
           {
             "id": "1",
+            "id_product": "1",
+            "id_size": "2",
+            "quantity": 1,
+            "price_per_unit": "170.00",
             "product": {
               "id": "1",
               "name": "Mexicana",
@@ -1327,20 +1625,21 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
               "id": "2",
               "name": "Mediana"
             },
-            "quantity": 1,
-            "price_per_unit": 170.00,
             "addons": [
               {
                 "id": "1",
-                "name": "Orilla de Queso Extra",
-                "price_at_purchase": 33.00
+                "id_addon": "2",
+                "price_at_purchase": "33.00",
+                "addon": {
+                  "id": "2",
+                  "name": "Orilla de Queso Extra"
+                }
               }
             ]
           }
         ]
       }
-    ],
-    "total": 1
+    ]
   }
 }
 ```
@@ -1363,13 +1662,14 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 2. Actualizar Estado de Pedido
 
-### PUT /api/delivery/orders/:id/status
+**PUT** `/api/delivery/orders/:id/status`
 
 Actualiza el estado de un pedido específico asignado al repartidor autenticado.
 
 #### Autenticación Requerida
 - **Token JWT**: Sí (Header: `Authorization: Bearer <token>`)
 - **Rol Requerido**: `REPARTIDOR`
+- **Middleware**: `authMiddleware`, `checkRole('REPARTIDOR')`
 
 #### Parámetros de Ruta
 
@@ -1387,8 +1687,8 @@ Actualiza el estado de un pedido específico asignado al repartidor autenticado.
 
 | Estado Actual | Estados Permitidos | Descripción |
 |---------------|-------------------|-------------|
-| DESPACHADO | EN_CAMINO | El repartidor recoge el pedido y sale a entregar |
-| EN_CAMINO | ENTREGADO | El repartidor completa la entrega |
+| DESPACHADO | EN CAMINO | El repartidor recoge el pedido y sale a entregar |
+| EN CAMINO | ENTREGADO | El repartidor completa la entrega |
 
 #### Ejemplo de Petición
 
@@ -1398,7 +1698,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 Content-Type: application/json
 
 {
-  "status": "EN_CAMINO"
+  "status": "EN CAMINO"
 }
 ```
 
@@ -1408,15 +1708,15 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "message": "Estado del pedido actualizado exitosamente a EN_CAMINO",
+  "message": "Estado del pedido actualizado exitosamente a EN CAMINO",
   "data": {
     "order": {
       "id": "1",
-      "status": "EN_CAMINO",
+      "status": "EN CAMINO",
       "payment_method": "Efectivo",
-      "subtotal": 180.00,
-      "delivery_fee": 25.00,
-      "total": 205.00,
+      "subtotal": "180.00",
+      "delivery_fee": "25.00",
+      "total": "205.00",
       "created_at": "2024-01-15T10:30:00.000Z",
       "updated_at": "2024-01-15T11:15:00.000Z",
       "client": {
@@ -1456,7 +1756,7 @@ Content-Type: application/json
 ```json
 {
   "success": false,
-  "error": "Estado no válido. Los estados permitidos son: EN_CAMINO, ENTREGADO"
+  "error": "Estado no válido. Los estados permitidos son: EN CAMINO, ENTREGADO"
 }
 ```
 
@@ -1467,10 +1767,10 @@ Content-Type: application/json
   "error": "Transición de estado no válida",
   "details": {
     "current_status": "PAGADO",
-    "requested_status": "EN_CAMINO",
+    "requested_status": "EN CAMINO",
     "valid_transitions": {
-      "DESPACHADO": ["EN_CAMINO"],
-      "EN_CAMINO": ["ENTREGADO"]
+      "DESPACHADO": ["EN CAMINO"],
+      "EN CAMINO": ["ENTREGADO"]
     }
   }
 }
@@ -1490,8 +1790,8 @@ Content-Type: application/json
 
 El repartidor puede manejar pedidos en los siguientes estados:
 
-1. **DESPACHADO** → **EN_CAMINO**: El repartidor recoge el pedido del restaurante
-2. **EN_CAMINO** → **ENTREGADO**: El repartidor completa la entrega al cliente
+1. **DESPACHADO** → **EN CAMINO**: El repartidor recoge el pedido del restaurante
+2. **EN CAMINO** → **ENTREGADO**: El repartidor completa la entrega al cliente
 
 ### Seguridad Implementada
 
@@ -1545,7 +1845,7 @@ Para probar la funcionalidad del repartidor:
    Content-Type: application/json
    
    {
-     "status": "EN_CAMINO"
+     "status": "EN CAMINO"
    }
    
    # PUT - Marcar como entregado
@@ -1561,3 +1861,127 @@ Para probar la funcionalidad del repartidor:
 6. **Verificar que solo ve pedidos asignados a él**
 
 7. **Verificar que las transiciones de estado funcionan correctamente**
+
+---
+
+## 🔧 Troubleshooting - Compatibilidad MySQL
+
+### Problemas Comunes y Soluciones
+
+#### Error: "Native type DoublePrecision is not supported for mysql connector"
+
+**Causa**: El schema de Prisma contiene anotaciones específicas de PostgreSQL que no son compatibles con MySQL.
+
+**Solución**: 
+1. Verificar que el archivo `prisma/schema.prisma` no contenga anotaciones `@db.DoublePrecision`
+2. Los campos de coordenadas deben estar definidos como `Float` sin anotaciones específicas:
+
+```prisma
+// ✅ Correcto para MySQL
+model address {
+  lat          Float
+  lng          Float
+}
+
+// ❌ Incorrecto (específico de PostgreSQL)
+model address {
+  lat          Float    @db.DoublePrecision
+  lng          Float    @db.DoublePrecision
+}
+```
+
+#### Error: "Unknown field id_branch"
+
+**Causa**: El cliente de Prisma no está actualizado después de modificar el schema.
+
+**Solución**:
+```bash
+# Regenerar el cliente de Prisma
+npx prisma generate
+
+# Reiniciar el servidor
+npm run dev
+```
+
+#### Error de Conexión a MySQL
+
+**Verificar configuración**:
+1. **URL de conexión correcta**:
+   ```env
+   DATABASE_URL="mysql://usuario:password@localhost:3306/nombre_bd"
+   ```
+
+2. **Credenciales válidas**: Usuario y contraseña correctos
+
+3. **Base de datos existente**: La base de datos debe existir antes de ejecutar migraciones
+
+4. **Puerto correcto**: MySQL por defecto usa el puerto 3306
+
+#### Error: "Table doesn't exist"
+
+**Solución**:
+```bash
+# Aplicar migraciones
+npx prisma db push
+
+# O crear migración
+npx prisma migrate dev --name init
+```
+
+#### Verificar Estado del Schema
+
+**Comando para verificar**:
+```bash
+# Verificar que el schema es válido
+npx prisma validate
+
+# Ver estado de la base de datos
+npx prisma db pull
+```
+
+#### Migración desde PostgreSQL a MySQL
+
+Si estás migrando desde PostgreSQL:
+
+1. **Actualizar el datasource**:
+   ```prisma
+   datasource db {
+     provider = "mysql"  // Cambiar de "postgresql" a "mysql"
+     url      = env("DATABASE_URL")
+   }
+   ```
+
+2. **Eliminar anotaciones específicas de PostgreSQL**:
+   - `@db.DoublePrecision` → `Float`
+   - `@db.Uuid` → `String @id @default(uuid())`
+   - `@db.Timestamp(0)` → `DateTime @db.Timestamp(0)`
+
+3. **Regenerar y aplicar**:
+   ```bash
+   npx prisma generate
+   npx prisma db push
+   ```
+
+### Comandos de Diagnóstico
+
+```bash
+# Verificar conexión a la base de datos
+npx prisma db pull
+
+# Ver el estado actual del schema
+npx prisma format
+
+# Generar cliente con información detallada
+npx prisma generate --schema=./prisma/schema.prisma
+
+# Verificar que las migraciones están aplicadas
+npx prisma migrate status
+```
+
+### Logs Útiles
+
+Para debugging, revisar:
+- Logs del servidor Node.js
+- Logs de MySQL (`/var/log/mysql/error.log` en Linux)
+- Output de `npx prisma generate`
+- Variables de entorno (verificar que `DATABASE_URL` esté configurada)
